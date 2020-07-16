@@ -35,15 +35,17 @@ class Product(db.Model):
   product_name = db.Column(db.String(), nullable=False)
   product_price = db.Column(db.Integer, nullable=False)
   product_description = db.Column(db.String(), nullable=False)
+  data = db.Column(db.String(), nullable=False)
 
-  def __init__(self, product_name, product_price, product_description):
+  def __init__(self, product_name, product_price, product_description, data):
     self.product_name = product_name
     self.product_price = product_price
     self.product_description = product_description
+    self.data = data
 
 class ProductSchema(ma.Schema):
   class Meta:
-    fields = ("id", "product_name", "product_price", "product_description" )
+    fields = ("id", "product_name", "product_price", "product_description", "data")
 
 product_schema = ProductSchema()
 products_schema = ProductSchema(many=True)
@@ -92,11 +94,49 @@ def get_all_users():
 @app.route("/user/get/<id>", methods=["GET"])
 def get_user_by_id(id):
   user = db.session.query(User).filter(User.id == id).first()
-  return jsonify(user_schema.dum;(user))
-  
-@app.route("/products/add", methods=["POST"])
+  return jsonify(user_schema.dump(user))
+
+@app.route("/user/delete/<id>", methods=["DELETE"])
+def delete_user(id):
+  user_data = db.session.query(User).filter(User.id == id).first()
+  db.session.delete(user_data)
+  db.session.commit()
+  return jsonify("User deleted successfully")
+
+@app.route("/product/add", methods=["POST"])
 def add_product():
-  product_name = request.form.get
+  if request.content_type != "application/json":
+    return jsonify("Error verifying user: Data must be sent as JSON")
+  post_data = request.get_json()
+  product_name = post_data.get("name")
+  product_price = post_data.get("price")
+  product_description = post_data.get("description")
+  data = post_data.get("data")
+
+  new_product = Product(product_name, product_price, product_description, data)
+  db.session.add(new_product)
+  db.session.commit()
+
+  return jsonify("Product added successfully")
+
+@app.route("/product/get", methods=["GET"])
+def get_product():
+  all_products = db.session.query(Product).all()
+  return jsonify(products_schema.dump(all_products))
+
+@app.route("/product/get/<id>", methods=["GET"])
+def get_product_by_id(id):
+  product_data = db.session.query(Product).filter(Product.id == id).first()
+  return jsonify(product_schema.dump(product_data))
+
+
+@app.route("/product/delete/<id>", methods=["DELETE"])
+def delete_product(id):
+  product_data = db.session.query(Product).filter(Product.id == id).first()
+  db.session.delete(product_data)
+  db.session.commit()
+  return jsonify("product deleted successfully")
+
 
 
 if __name__ == "__main__":
