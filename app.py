@@ -14,6 +14,8 @@ ma = Marshmallow(app)
 heroku = Heroku(app)
 CORS(app)
 
+statusKeep = ["NOT_LOGGED_IN"]
+
 class User(db.Model):
   id = db.Column(db.Integer, primary_key=True)
   email = db.Column(db.String(), nullable=False, unique=True)
@@ -66,6 +68,15 @@ def create_user():
 
   return jsonify("User created successfully")
 
+class UserVerification:
+  currentStatus = ""
+
+  def __init__(self, status="NOT_LOGGED_IN"):
+    self.currentStatus = status
+
+  def changeLoginStatus(self):
+    return self.currentStatus
+
 @app.route("/user/verification", methods=["POST"])
 def verify_user():
   if request.content_type != "application/json":
@@ -78,14 +89,34 @@ def verify_user():
   stored_password = db.session.query(User.password).filter(User.email == email).first()
 
   if stored_password is None:
+    user = UserVerification("NOT_LOGGED_IN")
+    statusKeep.append(user.changeLoginStatus())
     return jsonify("User not verified")
 
   if password != stored_password[0]:
+    user = UserVerification("NOT_LOGGED_IN")
+    statusKeep.append(user.changeLoginStatus())
     return jsonify("User not verified")
     
+  if password == stored_password[0]:
+    user = UserVerification("LOGGED_IN")
+    statusKeep.append(user.changeLoginStatus())
+    return jsonify("User verified")
 
-  return jsonify("User verified")
+@app.route("/user/logged_in", methods=["GET"])
+def get_current_status():
+  # return jsonify(statusKeep[-1])
+  if(statusKeep[-1] != "LOGGED_IN"):
+    status = "NOT_LOGGED_IN"
+    statusKeep[:] = []
+    return jsonify(status)
 
+  if(statusKeep[-1] == "LOGGED_IN"):
+    status = "LOGGED_IN"
+    statusKeep[:] = []
+    return jsonify(status)
+  
+    
 @app.route("/user/get", methods=["GET"])
 def get_all_users():
     all_users = db.session.query(User).all()
