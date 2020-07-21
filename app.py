@@ -3,31 +3,31 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_marshmallow import Marshmallow
 from flask_cors import CORS
 from flask_heroku import Heroku
+from flask_bcrypt import Bcrypt
 import io
 
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = "postgres://ymmwlgmljxcqsy:ccf5208d8533ffefa0c52369221917e1c26bcd826438b9f9eaf1f96b90fc8c20@ec2-54-146-4-66.compute-1.amazonaws.com:5432/d3et0i60qnm811"
+app.config["SQLALCHEMY_DATABASE_URI"] = "postgres://mgmnrckxllwthb:3febec993418d7c10b3f03b134d7c9c7f05f8e7b79b888ea8d5db550deba7850@ec2-3-229-210-93.compute-1.amazonaws.com:5432/d2g8m05t9qlmtc"
 
 db = SQLAlchemy(app)
 ma = Marshmallow(app)
 
 heroku = Heroku(app)
 CORS(app)
-
-statusKeep = ["NOT_LOGGED_IN"]
+bcrypt = Bcrypt(app)
 
 class User(db.Model):
   id = db.Column(db.Integer, primary_key=True)
-  email = db.Column(db.String(), nullable=False, unique=True)
-  password = db.Column(db.String(), nullable=False) 
+  username = db.Column(db.String(), nullable=False, unique=True)
+  password = db.Column(db.String(), nullable=False)
 
-  def __init__(self, email, password):
-    self.email = email
+  def __init__(self, username, password):
+    self.username = username
     self.password = password
 
 class UserSchema(ma.Schema):
   class Meta:
-    fields = ("id", "email", "password")
+    fields = ("id", "username", "password")
 
 user_schema = UserSchema()
 users_schema = UserSchema(many=True)
@@ -59,23 +59,21 @@ def create_user():
     return jsonify("Error creating user: Data must be sent as JSON")
 
   post_data = request.get_json()
-  email = post_data.get("email")
+  username = post_data.get("username")
   password = post_data.get("password")
 
-  record = User(email, password)
+  username_check = db.session.query(User.username).filter(User.username == username).first()
+  if username_check is not None:
+    return jsonify("Username taken")
+
+  hashed_password = bcrypt.generate_password_hash(password).decode("utf8")
+
+  record = User(username, hashed_password)
   db.session.add(record)
   db.session.commit()
 
   return jsonify("User created successfully")
 
-class UserVerification:
-  currentStatus = ""
-
-  def __init__(self, status="NOT_LOGGED_IN"):
-    self.currentStatus = status
-
-  def changeLoginStatus(self):
-    return self.currentStatus
 
 @app.route("/user/verification", methods=["POST"])
 def verify_user():
@@ -83,39 +81,19 @@ def verify_user():
     return jsonify("Error verifying user: Data must be sent as JSON")
 
   post_data = request.get_json()
-  email = post_data.get("email")
+  username = post_data.get("username")
   password = post_data.get("password")
   
-  stored_password = db.session.query(User.password).filter(User.email == email).first()
+  stored_password = db.session.query(User.password).filter(User.username == username).first()
 
   if stored_password is None:
-    user = UserVerification("NOT_LOGGED_IN")
-    statusKeep.append(user.changeLoginStatus())
     return jsonify("User not verified")
 
-  if password != stored_password[0]:
-    user = UserVerification("NOT_LOGGED_IN")
-    statusKeep.append(user.changeLoginStatus())
+  valid_password_check = bcrypt.check_password_hash(stored_password[0], password)
+  if valid_password_check == False:
     return jsonify("User not verified")
     
-  if password == stored_password[0]:
-    user = UserVerification("LOGGED_IN")
-    statusKeep.append(user.changeLoginStatus())
-    return jsonify("User verified")
-
-@app.route("/user/logged_in", methods=["GET"])
-def get_current_status():
-  # return jsonify(statusKeep[-1])
-  if(statusKeep[-1] != "LOGGED_IN"):
-    status = "NOT_LOGGED_IN"
-    statusKeep[:] = []
-    return jsonify(status)
-
-  if(statusKeep[-1] == "LOGGED_IN"):
-    status = "LOGGED_IN"
-    statusKeep[:] = []
-    return jsonify(status)
-  
+  return jsonify("User verified")  
     
 @app.route("/user/get", methods=["GET"])
 def get_all_users():
