@@ -52,6 +52,20 @@ class ProductSchema(ma.Schema):
 product_schema = ProductSchema()
 products_schema = ProductSchema(many=True)
 
+class CartItems(db.Model):
+  id = db.Column(db.Integer, primary_key=True)
+  cart = db.Column(db.PickleType())
+
+  def __init__(self, cart):
+    self.cart = cart
+
+class CartSchema(ma.Schema):
+  class Meta:
+    fields = ("id", "cart")
+
+cart_schema = CartSchema()
+carts_Schema = CartSchema(many=True)
+
 
 @app.route("/user/create", methods=["POST"])
 def create_user():
@@ -145,6 +159,26 @@ def delete_product(id):
   db.session.delete(product_data)
   db.session.commit()
   return jsonify("product deleted successfully")
+
+
+@app.route("/item/add", methods=["POST"])
+def add_cart_items():
+  if request.content_type != "application/json":
+    return jsonify("Error verifying cart item: Data must be sent as JSON")
+  post_data = request.get_json()
+  cart = post_data.get("cart")
+
+  new_item = CartItems(cart)
+  db.session.add(new_item)
+  db.session.commit()
+
+  return jsonify("Item added successfully")
+
+@app.route("/items/get", methods=["GET"])
+def get_cart_items():
+  all_items = db.session.query(CartItems).all()
+  return jsonify(carts_Schema.dump(all_items))
+
 
 
 
