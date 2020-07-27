@@ -179,6 +179,15 @@ def get_cart_items():
   all_items = db.session.query(CartItems).all()
   return jsonify(carts_Schema.dump(all_items))
 
+@app.route("/items/delete", methods=["DELETE"])
+def delete_cart_items():
+  all_cart_items = db.session.query(CartItems).\
+  delete()
+  db.session.commit()
+
+  return jsonify("items deleted")
+
+
 
 
 
